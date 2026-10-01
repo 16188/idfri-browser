@@ -1,0 +1,64 @@
+diff --git a/components/fury/fury_config.cc b/components/fury/fury_config.cc
+index 72e603d1c6..ae8f2ea076 100644
+--- a/components/fury/fury_config.cc
++++ b/components/fury/fury_config.cc
+@@ -14 +14,6 @@
+ #include "base/values.h"
++#include "build/build_config.h"
++
++#if BUILDFLAG(IS_WIN)
++#include <windows.h>
++#endif
+@@ -49,8 +54,8 @@ base::ReadOnlySharedMemoryRegion& GetRegionStorage() {
+ constexpr size_t kMaxConfigBytes = 4 * 1024 * 1024;
+ 
+-// Reads to EOF. base::File rather than read(2) so that the same code serves a
+-// POSIX descriptor and a Windows HANDLE; ReadAtCurrentPos retries EINTR itself,
+-// which is what HANDLE_EINTR was doing here before.
++// Reads to EOF. Windows uses ReadFile because base::File's current-position
++// helper expects a seekable handle, while the secure agent carrier is an
++// anonymous pipe. Other platforms keep base::File so EINTR is retried.
+ std::optional<std::string> ReadAll(base::File& file) {
+   if (!file.IsValid()) {
+     LOG(ERROR) << "fury: the fingerprint config slot is not a readable file";
+@@ -62,21 +67,35 @@ std::optional<std::string> ReadAll(base::File& file) {
+     // span(buf), not span(buf, sizeof(buf)): the two-argument form is the one
+     // -Wunsafe-buffer-usage rejects, and deducing the extent from the array is
+     // both safe and one fewer place for the size to be wrong.
+-    std::optional<size_t> n =
++    size_t n = 0;
++#if BUILDFLAG(IS_WIN)
++    DWORD read = 0;
++    if (!::ReadFile(file.GetPlatformFile(), buf, sizeof(buf), &read, nullptr)) {
++      if (::GetLastError() == ERROR_BROKEN_PIPE) {
++        break;
++      }
++      LOG(ERROR) << "fury: reading fingerprint config";
++      return std::nullopt;
++    }
++    n = read;
++#else
++    std::optional<size_t> read =
+         file.ReadAtCurrentPos(base::as_writable_byte_span(base::span(buf)));
+-    if (!n.has_value()) {
++    if (!read.has_value()) {
+       LOG(ERROR) << "fury: reading fingerprint config";
+       return std::nullopt;
+     }
+-    if (*n == 0) {
++    n = *read;
++#endif
++    if (n == 0) {
+       break;
+     }
+-    if (out.size() + *n > kMaxConfigBytes) {
++    if (out.size() + n > kMaxConfigBytes) {
+       LOG(ERROR) << "fury: fingerprint config exceeds " << kMaxConfigBytes
+                  << " bytes";
+       return std::nullopt;
+     }
+-    out.append(buf, *n);
++    out.append(buf, n);
+   }
+   return out;
+ }

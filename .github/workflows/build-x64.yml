@@ -1,0 +1,25 @@
+name: build-x64
+on:
+  workflow_dispatch:
+    inputs:
+      resume_run_id:
+        description: Previous build run containing build-artifact to resume
+        required: false
+        type: string
+  push:
+    tags:
+      - '*'
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: build-x64-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      resume_run_id: ${{ inputs.resume_run_id || '' }}
