@@ -1,0 +1,81 @@
+name: publish-idfri-x64
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Successful build-x64 run containing the chromium artifact
+        required: true
+        type: string
+  workflow_run:
+    workflows: [build-x64]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'workflow_dispatch' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       (github.event.workflow_run.head_branch == 'idfri-153' ||
+        github.event.workflow_run.head_branch == 'idfri-153-fast'))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate source build
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_RUN_ID: ${{ inputs.run_id || github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$REQUESTED_RUN_ID" =~ ^[1-9][0-9]*$ ]] || { echo 'invalid build run ID' >&2; exit 1; }
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$REQUESTED_RUN_ID")"
+          [[ "$(jq -r .name <<<"$run")" == 'build-x64' ]]
+          [[ "$(jq -r .path <<<"$run")" == '.github/workflows/build-x64.yml' ]]
+          [[ "$(jq -r .status <<<"$run")" == 'completed' ]]
+          [[ "$(jq -r .conclusion <<<"$run")" == 'success' ]]
+          [[ "$(jq -r .event <<<"$run")" == 'workflow_dispatch' ]]
+          [[ "$(jq -r .head_repository.full_name <<<"$run")" == "$GITHUB_REPOSITORY" ]]
+          branch="$(jq -r .head_branch <<<"$run")"
+          [[ "$branch" == 'idfri-153' || "$branch" == 'idfri-153-fast' ]]
+          source_sha="$(jq -r .head_sha <<<"$run")"
+          [[ "$source_sha" =~ ^[a-f0-9]{40}$ ]]
+          echo "run_id=$REQUESTED_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v8
+        with:
+          name: chromium
+          path: artifacts
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.source.outputs.run_id }}
+      - name: Verify and publish IDFRI Browser
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          TAG: browser-v153.0.8010.52-idfri.2
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t archives < <(find artifacts -maxdepth 1 -type f -name 'idfri-browser_*_windows_x64.zip' -print)
+          mapfile -t installers < <(find artifacts -maxdepth 1 -type f -name 'idfri-browser_*_installer_x64.exe' -print)
+          if [ "${#archives[@]}" -ne 1 ] || [ "${#installers[@]}" -ne 1 ]; then
+            echo 'IDFRI Browser artifact set is incomplete' >&2
+            exit 1
+          fi
+          sha256sum "${archives[0]}" "${installers[0]}" > artifacts/SHA256SUMS.txt
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${archives[0]}" "${installers[0]}" artifacts/SHA256SUMS.txt --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" "${archives[0]}" "${installers[0]}" artifacts/SHA256SUMS.txt \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" --prerelease \
+              --title 'IDFRI Browser 153.0.8010.52 指纹内核开发版' \
+              --notes 'IDFRI 项目自构建的简体中文 Chromium 指纹内核，包含 BSD-3-Clause 源码级指纹补丁和构建后运行验证。开发阶段制品，暂未进行 Authenticode 签名。项目：https://github.com/16188/idfri-browser'
+          fi

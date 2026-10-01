@@ -1,0 +1,394 @@
+name: reusable-build
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        type: string
+        required: false
+        default: '3.12'
+      x86:
+        type: boolean
+        required: false
+        default: false
+      arm:
+        type: boolean
+        required: false
+        default: false
+      resume_run_id:
+        type: string
+        required: false
+        default: ''
+
+env:
+  PYTHONUTF8: '1'
+
+jobs:
+  build-1:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Restore previous build stage
+        if: inputs.resume_run_id != ''
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: C:\ungoogled-chromium-windows\build
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.resume_run_id }}
+      - name: Extract previous build stage and apply the pipe fix
+        if: inputs.resume_run_id != ''
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = 'C:\ungoogled-chromium-windows'
+          & 7z x "$root\build\artifacts.zip" "-o$root\build" -y
+          if ($LASTEXITCODE -ne 0) { throw 'Could not extract the previous build stage' }
+          $source = "$root\build\src\components\fury\fury_config.cc"
+          if ((Get-Content $source -Raw) -notmatch 'ERROR_BROKEN_PIPE') {
+            & "$root\build\src\third_party\git\usr\bin\patch.exe" `
+              --directory="$root\build\src" --strip=1 --forward --batch `
+              --input="$root\fingerprint-patches\0002-windows-stdin-pipe.patch"
+            if ($LASTEXITCODE -ne 0) { throw 'Could not apply the Windows stdin pipe fix' }
+          }
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: false
+          from_artifact: false
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-2:
+    needs: build-1
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-3:
+    needs: build-2
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-4:
+    needs: build-3
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-5:
+    needs: build-4
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-6:
+    needs: build-5
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-7:
+    needs: build-6
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-8:
+    needs: build-7
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-9:
+    needs: build-8
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-10:
+    needs: build-9
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-11:
+    needs: build-10
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-12:
+    needs: build-11
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-13:
+    needs: build-12
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-14:
+    needs: build-13
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-15:
+    needs: build-14
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  build-16:
+    needs: build-15
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: 'recursive'
+      - name: Prepare
+        uses: ./.github/actions/prepare
+        with:
+          python-version: ${{ inputs.python-version }}
+      - name: Run Stage
+        id: stage
+        uses: ./.github/actions/stage
+        with:
+          finished: ${{ join(needs.*.outputs.finished) }}
+          from_artifact: true
+          x86: ${{ inputs.x86 }}
+          arm: ${{ inputs.arm }}
+    outputs:
+      finished: ${{ steps.stage.outputs.finished }}
+  complete:
+    needs: build-16
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure build finished
+        run: |
+          if [ "${{ needs.build-16.outputs.finished }}" != "true" ]; then
+            echo "Build did not finish after 16 stages."
+            exit 1
+          fi
