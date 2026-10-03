@@ -1,0 +1,83 @@
+name: recover-linux-package
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Failed build-linux-x64 run containing completed build artifacts
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate source run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID")"
+          [ "$(jq -r .name <<<"$run")" = build-linux-x64 ]
+          [ "$(jq -r .path <<<"$run")" = .github/workflows/build-linux-x64.yml ]
+          [ "$(jq -r .head_repository.full_name <<<"$run")" = "$GITHUB_REPOSITORY" ]
+          [ "$(jq -r .head_branch <<<"$run")" = main ]
+      - name: Initialize pinned portable Linux source
+        run: bash scripts/linux-stage.sh init
+      - uses: actions/download-artifact@v4
+        with:
+          name: idfri-linux-builder
+          path: /tmp
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-cache-x86_64
+          path: .github/cache
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+      - name: Restore, verify and package IDFRI Browser
+        run: |
+          bash scripts/linux-stage.sh load-image
+          bash scripts/linux-stage.sh import-cache
+          bash scripts/linux-stage.sh package
+      - name: Verify release files
+        run: |
+          set -euo pipefail
+          cd portablelinux/build/release
+          sha256sum -c SHA256SUMS-linux.txt
+          jq -e '.version == "153.0.8010.52-1.idfri3" and (.archiveSha256 | test("^[a-f0-9]{64}$")) and (.chromeSha256 | test("^[a-f0-9]{64}$"))' idfri-browser-linux.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idfri-browser-linux-x64
+          path: |
+            portablelinux/build/release/idfri-browser_153.0.8010.52-1.idfri3_linux_x64.tar.xz
+            portablelinux/build/release/SHA256SUMS-linux.txt
+            portablelinux/build/release/idfri-browser-linux.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - name: Publish Linux IDFRI Browser
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: browser-v153.0.8010.52-idfri.3
+          target_commitish: ${{ github.sha }}
+          name: IDFRI Browser 153.0.8010.52 指纹内核开发版 3
+          prerelease: true
+          body: |
+            IDFRI 自构建的 Linux x64 Chromium 153 指纹内核。
+            已验证 `--fury-fp-fd=0` 配置通道和渲染器指纹生效。
+            包含 Chromium、ungoogled-chromium 和 BSD-3-Clause 指纹补丁的法定许可声明。
+          files: |
+            portablelinux/build/release/idfri-browser_153.0.8010.52-1.idfri3_linux_x64.tar.xz
+            portablelinux/build/release/SHA256SUMS-linux.txt
+            portablelinux/build/release/idfri-browser-linux.json

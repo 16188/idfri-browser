@@ -12,10 +12,10 @@ package_dir="${release_dir}/${name}"
 [ -x "${_out_dir}/chrome" ]
 [ -x "${_out_dir}/chromedriver" ]
 
-config='{"navigator":{"hardwareConcurrency":6}}'
+config='{"schema_version":1,"navigator":{"hardwareConcurrency":6}}'
 probe="$(printf '%s' "$config" | timeout 90s "${_out_dir}/chrome" \
   --fury-fp-fd=0 --headless=new --no-sandbox --disable-gpu \
-  --dump-dom 'data:text/html,<body><script>document.body.textContent=navigator.hardwareConcurrency</script>' 2>/dev/null)"
+  --dump-dom 'data:text/html,<body><script>document.body.textContent=navigator.hardwareConcurrency</script>')"
 grep -q '<body>6</body>' <<<"$probe"
 
 mkdir -p "$package_dir"

@@ -2,6 +2,7 @@
 
 ## 未发布
 
+- 修复 Linux 打包冒烟配置缺少 `schema_version` 导致 Chromium 主动中止的问题，并支持复用已完成的编译缓存重新验收、打包和发布，无需重复耗时编译。
 - 新增 Linux x64 IDFRI Chromium 153 完整构建链：固定 portablelinux/ungoogled-chromium 提交，复用同一组源码级指纹补丁和中文 IDFRI 品牌，分段续编译，并在发布前使用 `--fury-fp-fd=0` 进行真实渲染器指纹冒烟验证。
 - 将当前 Chromium 153 源码迁移为独立的 IDFRI Browser 单提交仓库，不迁移上游提交、标签和贡献者历史。
 - 将源码、构建输出和发布说明中的项目地址统一为 `https://github.com/16188/idfri-browser`。
