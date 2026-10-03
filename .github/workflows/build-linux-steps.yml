@@ -1,0 +1,176 @@
+name: reusable-linux-x64-build
+
+on:
+  workflow_call:
+
+jobs:
+  prep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/linux-stage
+        with:
+          prepare-only: "true"
+
+  build_part_01:
+    needs: prep
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_02:
+    needs: build_part_01
+    if: needs.build_part_01.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_03:
+    needs: build_part_02
+    if: needs.build_part_02.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_04:
+    needs: build_part_03
+    if: needs.build_part_03.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_05:
+    needs: build_part_04
+    if: needs.build_part_04.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_06:
+    needs: build_part_05
+    if: needs.build_part_05.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_07:
+    needs: build_part_06
+    if: needs.build_part_06.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_08:
+    needs: build_part_07
+    if: needs.build_part_07.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_09:
+    needs: build_part_08
+    if: needs.build_part_08.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    outputs:
+      status: ${{ steps.stage.outputs.status }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: stage
+        uses: ./.github/actions/linux-stage
+
+  build_part_10:
+    needs: build_part_09
+    if: needs.build_part_09.outputs.status == 'running'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/linux-stage
+        with:
+          final: "true"
+
+  package:
+    needs:
+      - prep
+      - build_part_01
+      - build_part_02
+      - build_part_03
+      - build_part_04
+      - build_part_05
+      - build_part_06
+      - build_part_07
+      - build_part_08
+      - build_part_09
+      - build_part_10
+    if: ${{ always() && !cancelled() && !failure() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize pinned portable Linux source
+        run: bash scripts/linux-stage.sh init
+      - uses: actions/download-artifact@v4
+        with:
+          name: idfri-linux-builder
+          path: /tmp
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-cache-x86_64
+          path: .github/cache
+      - name: Restore, verify and package IDFRI Browser
+        run: |
+          bash scripts/linux-stage.sh load-image
+          bash scripts/linux-stage.sh import-cache
+          bash scripts/linux-stage.sh package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: idfri-browser-linux-x64
+          path: |
+            portablelinux/build/release/idfri-browser_153.0.8010.52-1.idfri3_linux_x64.tar.xz
+            portablelinux/build/release/SHA256SUMS-linux.txt
+            portablelinux/build/release/idfri-browser-linux.json
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

@@ -1,0 +1,24 @@
+name: build-linux-x64
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - fingerprint-patches/**
+      - branding/**
+      - idfri_branding.py
+      - flags.linux.gn
+      - build_linux.sh
+      - package_linux.sh
+      - scripts/linux-stage.sh
+      - .github/actions/linux-stage/**
+      - .github/workflows/build-linux-*.yml
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-linux-steps.yml

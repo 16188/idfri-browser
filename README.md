@@ -1,17 +1,19 @@
 # IDFRI Browser
 
-IDFRI Browser 是由 IDFRI 构建并维护的 Windows x64 Chromium 指纹浏览器内核。
+IDFRI Browser 是由 IDFRI 构建并维护的 Windows/Linux x64 Chromium 指纹浏览器内核。
 
 - 产品与开发者：IDFRI
 - 项目主页：https://github.com/16188/idfri-browser
 - 默认界面：简体中文
-- 构建基础：Chromium、ungoogled-chromium-windows 与 BSD-3-Clause 源码级指纹补丁
+- 构建基础：Chromium、ungoogled-chromium Windows/Portable Linux 与 BSD-3-Clause 源码级指纹补丁
 - 发布状态：开发阶段制品，暂未进行 Authenticode 签名
 
 本仓库只保存可审计的品牌层和上游构建配置，不提交 Chromium 巨型源码树。Chromium、ungoogled-chromium 及第三方组件继续保留各自许可证和版权声明。
 指纹内核补丁固定来源于 Fury 7f0ddec3314d（https://github.com/furyteamtop/fury-antidetect-browser/commit/7f0ddec3314d027ed91d4ac6d1f637d18855423a）的 core/patches，该目录由上游明确以 BSD-3-Clause 发布。IDFRI 构建保留原版权与许可证，并通过标准输入传入每个资料的只读 JSON 配置，避免把完整指纹暴露在进程命令行。构建结束后会实际启动内核并验证渲染器读到指定的硬件并发值，验证失败不会打包。
 
 构建 x64 内核：在 GitHub Actions 中手动运行 `build-x64`。成功后 `publish-idfri-x64` 会发布 ZIP、安装器和 SHA-256 校验文件。
+
+构建 Linux x64 内核：手动运行 `build-linux-x64`，或将 Linux 构建文件推送到 `main`。工作流固定 portablelinux `153.0.8010.52-1` 及其 ungoogled-chromium 提交，分段续编译，打包前通过 `--fury-fp-fd=0` 启动真实内核验证指纹配置已进入渲染器。成功后 `publish-linux-idfri` 会发布 tar.xz、SHA-256 和机器可读元数据。
 
 ---
 # ungoogled-chromium-windows

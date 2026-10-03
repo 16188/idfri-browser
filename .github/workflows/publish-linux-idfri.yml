@@ -1,0 +1,61 @@
+name: publish-linux-idfri
+
+on:
+  workflow_run:
+    workflows: [build-linux-x64]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Validate source run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID")"
+          [ "$(jq -r .name <<<"$run")" = build-linux-x64 ]
+          [ "$(jq -r .path <<<"$run")" = .github/workflows/build-linux-x64.yml ]
+          [ "$(jq -r .conclusion <<<"$run")" = success ]
+          source_sha="$(jq -r .head_sha <<<"$run")"
+          [[ "$source_sha" =~ ^[a-f0-9]{40}$ ]]
+          echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: idfri-browser-linux-x64
+          path: artifacts
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ github.event.workflow_run.id }}
+      - name: Verify release files
+        run: |
+          set -euo pipefail
+          cd artifacts
+          sha256sum -c SHA256SUMS-linux.txt
+          jq -e '.version == "153.0.8010.52-1.idfri3" and (.archiveSha256 | test("^[a-f0-9]{64}$")) and (.chromeSha256 | test("^[a-f0-9]{64}$"))' idfri-browser-linux.json
+      - name: Publish Linux IDFRI Browser
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: browser-v153.0.8010.52-idfri.3
+          target_commitish: ${{ steps.source.outputs.source_sha }}
+          name: IDFRI Browser 153.0.8010.52 指纹内核开发版 3
+          prerelease: true
+          body: |
+            IDFRI 自构建的 Linux x64 Chromium 153 指纹内核。
+            已验证 `--fury-fp-fd=0` 配置通道和渲染器指纹生效。
+            包含 Chromium、ungoogled-chromium 和 BSD-3-Clause 指纹补丁的法定许可声明。
+          files: |
+            artifacts/idfri-browser_153.0.8010.52-1.idfri3_linux_x64.tar.xz
+            artifacts/SHA256SUMS-linux.txt
+            artifacts/idfri-browser-linux.json

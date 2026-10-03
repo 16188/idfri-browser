@@ -1,0 +1,92 @@
+name: IDFRI Linux Chromium stage
+description: Prepare or continue the pinned Linux x64 Chromium build
+
+inputs:
+  prepare-only:
+    required: false
+    default: "false"
+  final:
+    required: false
+    default: "false"
+
+outputs:
+  status:
+    value: ${{ steps.build.outputs.status }}
+
+runs:
+  using: composite
+  steps:
+    - name: Initialize pinned portable Linux source
+      shell: bash
+      run: bash scripts/linux-stage.sh init
+
+    - name: Set up Docker Buildx
+      if: ${{ inputs.prepare-only == 'true' }}
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build builder image
+      if: ${{ inputs.prepare-only == 'true' }}
+      shell: bash
+      run: |
+        bash scripts/linux-stage.sh image
+        bash scripts/linux-stage.sh save-image
+
+    - name: Upload builder image
+      if: ${{ inputs.prepare-only == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: idfri-linux-builder
+        path: /tmp/idfri-linux-builder.tar
+        retention-days: 7
+        compression-level: 0
+
+    - name: Download builder image
+      if: ${{ inputs.prepare-only != 'true' }}
+      uses: actions/download-artifact@v4
+      with:
+        name: idfri-linux-builder
+        path: /tmp
+
+    - name: Load builder image
+      if: ${{ inputs.prepare-only != 'true' }}
+      shell: bash
+      run: bash scripts/linux-stage.sh load-image
+
+    - name: Download build cache
+      if: ${{ inputs.prepare-only != 'true' }}
+      uses: actions/download-artifact@v4
+      with:
+        name: build-cache-x86_64
+        path: .github/cache
+
+    - name: Import build cache
+      if: ${{ inputs.prepare-only != 'true' }}
+      shell: bash
+      run: bash scripts/linux-stage.sh import-cache
+
+    - name: Prepare patched source tree
+      if: ${{ inputs.prepare-only == 'true' }}
+      shell: bash
+      run: bash scripts/linux-stage.sh prepare
+
+    - name: Continue Chromium build
+      if: ${{ inputs.prepare-only != 'true' }}
+      id: build
+      shell: bash
+      env:
+        IDFRI_FINAL_STAGE: ${{ inputs.final }}
+      run: bash scripts/linux-stage.sh build
+
+    - name: Export build cache
+      shell: bash
+      run: bash scripts/linux-stage.sh export-cache
+
+    - name: Upload build cache
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-cache-x86_64
+        path: .github/cache/build-cache-x86_64.tar.zst
+        if-no-files-found: error
+        overwrite: true
+        retention-days: 7
+        compression-level: 0
